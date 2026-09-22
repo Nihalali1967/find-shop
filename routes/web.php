@@ -23,7 +23,10 @@ use App\Http\Controllers\Web\Shop\StatusController as ShopStatusController;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Support\Facades\Route;
 
-Scramble::registerApi('api', ['api_path' => 'api/v1']);
+Scramble::registerApi('api', [
+    'api_path' => 'api/v1',
+    'middleware' => ['web'],
+]);
 
 /*
 |--------------------------------------------------------------------------
