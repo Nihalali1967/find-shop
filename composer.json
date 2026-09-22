@@ -7,7 +7,9 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "dedoc/scramble": "^0.13.45",
         "laravel/framework": "^13.17",
+        "laravel/sanctum": "*",
         "laravel/tinker": "^3.0"
     },
     "require-dev": {
@@ -37,12 +39,17 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
-            "npm install --ignore-scripts",
-            "npm run build"
+            "@php artisan db:seed --force",
+            "@php artisan storage:link"
         ],
-        "dev": [
-            "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+        "serve": [
+            "@php artisan serve"
+        ],
+        "queue": [
+            "@php artisan queue:listen --tries=1"
+        ],
+        "schedule": [
+            "@php artisan schedule:work"
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
