@@ -10,6 +10,7 @@ use App\Models\Color;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Services\Catalog\ProductService;
+use App\Support\DataTable;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,18 +24,27 @@ class ProductController extends Controller
     {
         $shop = $this->currentShop($request);
 
+        $sort = DataTable::sortable($request, ['name', 'status', 'created_at', 'price']);
+        $direction = DataTable::direction($request);
+
         $products = Product::ownedBy($shop->id)
             ->with(['images', 'colors', 'unit', 'subcategory.category'])
             ->when($request->input('q'), function ($query, $q) {
-                $query->where(function ($inner) use ($q) {
-                    $inner->where('name', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%')
-                        ->orWhere('title', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%');
+                $like = DataTable::like($q);
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('name', 'like', $like)
+                        ->orWhere('title', 'like', $like);
                 });
             })
             ->when($request->input('status'), fn ($query, $status) => $query->where('status', $status))
             ->when($request->integer('category_id'), fn ($query, $id) => $query->whereHas('subcategory', fn ($s) => $s->where('category_id', $id)))
+            ->when($sort === 'name', fn ($query) => $query->orderBy('name', $direction))
+            ->when($sort === 'status', fn ($query) => $query->orderBy('status', $direction))
+            ->when($sort === 'created_at', fn ($query) => $query->orderBy('created_at', $direction))
+            ->when($sort === 'price', fn ($query) => $query->orderByRaw('COALESCE(offer_price_paise, price_paise) '.$direction))
             ->latest('id')
-            ->paginate(12);
+            ->paginate(DataTable::perPage($request, 12))
+            ->withQueryString();
 
         return view('shop.products.index', [
             'shop' => $shop,

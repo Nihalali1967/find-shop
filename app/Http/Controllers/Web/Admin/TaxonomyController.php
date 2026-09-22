@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Subcategory;
 use App\Services\Audit\AuditLogger;
+use App\Support\DataTable;
 use App\Support\NameNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class TaxonomyController extends Controller
     {
         $categories = Category::query()
             ->withCount('subcategories')
+            ->when($request->filled('q'), fn ($query) => $query->where('name', 'like', DataTable::like($request->input('q'))))
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -28,12 +30,25 @@ class TaxonomyController extends Controller
             ? Category::find($request->integer('category_id'))
             : $categories->first();
 
+        $sort = DataTable::sortable($request, ['name', 'products_count', 'sort_order']);
+        $direction = DataTable::direction($request);
+
         return view('admin.taxonomy.index', [
             'categories' => $categories,
             'selected' => $selected,
             'subcategories' => $selected
-                ? Subcategory::where('category_id', $selected->id)->withCount('products')->orderBy('sort_order')->get()
-                : collect(),
+                ? Subcategory::query()
+                    ->where('category_id', $selected->id)
+                    ->withCount('products')
+                    ->when($request->filled('sq'), fn ($query) => $query->where('name', 'like', DataTable::like($request->input('sq'))))
+                    ->when($sort === 'name', fn ($query) => $query->orderBy('name', $direction))
+                    ->when($sort === 'products_count', fn ($query) => $query->orderBy('products_count', $direction))
+                    ->when($sort === 'sort_order', fn ($query) => $query->orderBy('sort_order', $direction))
+                    ->when($sort === null, fn ($query) => $query->orderBy('sort_order'))
+                    ->orderBy('name')
+                    ->paginate(DataTable::perPage($request, 10))
+                    ->withQueryString()
+                : null,
         ]);
     }
 

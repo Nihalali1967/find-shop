@@ -85,8 +85,8 @@
         }
     }
 
-    function initChips() {
-        $$(".chip input[type=checkbox]").forEach((input) => {
+    function initChips(root) {
+        $$(".chip input[type=checkbox]", root).forEach((input) => {
             const chip = input.closest(".chip");
             if (!chip) return;
             const sync = () => chip.classList.toggle("is-on", input.checked);
@@ -261,13 +261,13 @@
         });
     }
 
-    function initConfirms() {
-        $$("form[data-confirm]").forEach((form) => {
+    function initConfirms(root) {
+        $$("form[data-confirm]", root).forEach((form) => {
             form.addEventListener("submit", (event) => {
                 if (!window.confirm(form.getAttribute("data-confirm"))) event.preventDefault();
             });
         });
-        $$("[data-confirm-click]").forEach((el) => {
+        $$("[data-confirm-click]", root).forEach((el) => {
             el.addEventListener("click", (event) => {
                 if (!window.confirm(el.getAttribute("data-confirm-click"))) event.preventDefault();
             });
@@ -473,6 +473,74 @@
 
     /* -------------------------------------------------------------- misc */
 
+    /* ---------------------------------------------------- datatable lists */
+
+    /**
+     * Server-rendered DataTables: the search box, per-page select and
+     * pagination links all re-render the page server side. With JavaScript
+     * available, the response is fetched and only the listing region is
+     * swapped in, so typing keeps focus. Without JS, plain GET requests work.
+     */
+    function initDataTables() {
+        $$('form[data-dt-form]').forEach((form) => {
+            const selector = form.getAttribute("data-dt-target");
+            const region = selector ? $(selector) : null;
+            if (!region) return;
+
+            form.classList.add("is-enhanced");
+            const search = $("[data-dt-search]", form);
+            let timer = null;
+
+            const buildUrl = () => {
+                const params = new URLSearchParams(new FormData(form)).toString();
+                return form.getAttribute("action") + (params ? "?" + params : "");
+            };
+
+            const swap = (target) => {
+                fetch(target, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+                    .then((r) => {
+                        if (!r.ok) throw new Error("bad status");
+                        return r.text();
+                    })
+                    .then((html) => {
+                        const doc = new DOMParser().parseFromString(html, "text/html");
+                        const next = doc.querySelector(selector);
+                        if (!next) throw new Error("missing region");
+                        region.replaceChildren(...Array.prototype.slice.call(next.childNodes));
+                        window.history.replaceState({}, "", target);
+                        initConfirms(region);
+                        initChips(region);
+                    })
+                    .catch(() => {
+                        window.location.href = target; // graceful full-page fallback
+                    });
+            };
+
+            if (search) {
+                search.addEventListener("input", () => {
+                    window.clearTimeout(timer);
+                    timer = window.setTimeout(() => swap(buildUrl()), 420);
+                });
+            }
+
+            $$('[data-autosubmit]', form).forEach((el) => {
+                el.addEventListener("change", () => swap(buildUrl()));
+            });
+
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                swap(buildUrl());
+            });
+
+            region.addEventListener("click", (event) => {
+                const link = event.target.closest("a[href]");
+                if (!link || !link.closest(".pagination")) return;
+                event.preventDefault();
+                swap(link.href);
+            });
+        });
+    }
+
     function initFlash() {
         const flash = $("[data-flash]");
         if (flash) toast(flash.getAttribute("data-flash"), flash.getAttribute("data-flash-error") === "1");
@@ -490,13 +558,14 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         initFilterForms();
-        initChips();
+        initChips(document);
         initNameCheck();
         initProductForm();
         initImagePreview();
         initGallery();
         initModals();
-        initConfirms();
+        initConfirms(document);
+        initDataTables();
         initChat();
         initFlash();
         initStylingSelects();

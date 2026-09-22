@@ -63,19 +63,42 @@
             </form>
         </div>
 
-        <div class="card">
+        <x-dt-toolbar :paginator="$invitations" placeholder="Shop name or owner phone…" search-label="Search invitations">
+            <div class="dt-field">
+                <label class="sr-only" for="inv-state">State</label>
+                <select id="inv-state" name="state" data-autosubmit>
+                    <option value="">All states</option>
+                    <option value="pending" @selected(request('state') === 'pending')>Pending</option>
+                    <option value="claimed" @selected(request('state') === 'claimed')>Claimed</option>
+                    <option value="expired" @selected(request('state') === 'expired')>Expired</option>
+                </select>
+            </div>
+        </x-dt-toolbar>
+
+        <div class="card" id="invitations-region" data-dt-region>
             <div class="card-head">
                 <h2>Invitations</h2>
                 <span class="muted" style="font-size:.84rem">Claim links are shown once on creation</span>
             </div>
 
+            <div class="card-body" style="padding:0 20px 4px">
+                <x-dt-info :paginator="$invitations" label="invitation" :q="request('q')" />
+            </div>
+
             @if ($invitations->isEmpty())
-                <x-empty-state title="No invitations" glyph="✚" message="Create one on the left to onboard a shop manually." />
+                <x-empty-state title="No invitations matched" glyph="✚"
+                    message="Try a different search, clear the filters, or create one on the left." />
             @else
                 <div class="table-wrap" style="border:0;border-radius:0">
                     <table class="table">
                         <thead>
-                            <tr><th>Shop</th><th>Intended owner</th><th>Status</th><th>Expires</th><th class="text-right">Actions</th></tr>
+                            <tr>
+                                <x-dt-th col="name">Shop</x-dt-th>
+                                <th>Intended owner</th>
+                                <th>Status</th>
+                                <th>Expires</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
                         </thead>
                         <tbody>
                             @foreach ($invitations as $invitation)

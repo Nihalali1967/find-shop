@@ -7,6 +7,7 @@ use App\Models\Shop;
 use App\Services\Audit\AuditLogger;
 use App\Services\Notifications\NotificationService;
 use App\Services\Shops\ShopService;
+use App\Support\DataTable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,11 +16,14 @@ class ShopController extends Controller
 {
     public function index(Request $request): View
     {
+        $sort = DataTable::sortable($request, ['name', 'products_count', 'status', 'created_at']);
+        $direction = DataTable::direction($request);
+
         $shops = Shop::query()
             ->with('owner')
             ->withCount('products')
             ->when($request->input('q'), function ($query, $q) {
-                $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%';
+                $like = DataTable::like($q);
                 $query->where(function ($inner) use ($like) {
                     $inner->where('name', 'like', $like)
                         ->orWhere('locality', 'like', $like)
@@ -28,9 +32,14 @@ class ShopController extends Controller
                 });
             })
             ->when($request->input('status'), fn ($query, $status) => $query->where('status', $status))
-            ->when($request->input('locality'), fn ($query, $locality) => $query->where('locality', 'like', '%'.$locality.'%'))
+            ->when($request->input('locality'), fn ($query, $locality) => $query->where('locality', 'like', DataTable::like($locality)))
+            ->when($sort === 'name', fn ($query) => $query->orderBy('name', $direction))
+            ->when($sort === 'products_count', fn ($query) => $query->orderBy('products_count', $direction))
+            ->when($sort === 'status', fn ($query) => $query->orderBy('status', $direction))
+            ->when($sort === 'created_at', fn ($query) => $query->orderBy('created_at', $direction))
             ->latest('id')
-            ->paginate(15);
+            ->paginate(DataTable::perPage($request, 15))
+            ->withQueryString();
 
         return view('admin.shops.index', [
             'shops' => $shops,

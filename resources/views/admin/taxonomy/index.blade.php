@@ -91,16 +91,32 @@
                 <div class="card">
                     <div class="card-head">
                         <h2>Subcategories</h2>
-                        <span class="muted" style="font-size:.84rem">{{ $subcategories->count() }} total</span>
+                        <span class="muted" style="font-size:.84rem">{{ $subcategories->total() }} {{ \Illuminate\Support\Str::plural('total', $subcategories->total()) }}</span>
                     </div>
 
-                    <div class="card-body">
-                        @if ($subcategories->isEmpty())
-                            <p class="muted">No subcategories yet. Add the first one below.</p>
-                        @else
+                    <div class="card-body" style="padding:0 20px 4px">
+                        <x-dt-toolbar :paginator="$subcategories" search-name="sq"
+                            placeholder="Search subcategories…" search-label="Search subcategories" />
+                    </div>
+
+                    <div class="card-body" style="padding:0 20px 4px">
+                        <x-dt-info :paginator="$subcategories" label="subcategory" :q="request('sq')" />
+                    </div>
+
+                    @if ($subcategories->isEmpty())
+                        <div class="card-body">
+                            <p class="muted">No subcategories matched. Adjust the search or add one below.</p>
+                        </div>
+                    @else
                             <div class="table-wrap">
                                 <table class="table">
-                                    <thead><tr><th>Name</th><th>Products</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
+                                    <thead><tr>
+                                        <x-dt-th col="name">Name</x-dt-th>
+                                        <x-dt-th col="products_count">Products</x-dt-th>
+                                        <x-dt-th col="sort_order">Order</x-dt-th>
+                                        <th>Status</th>
+                                        <th class="text-right">Actions</th>
+                                    </tr></thead>
                                     <tbody>
                                         @foreach ($subcategories as $subcategory)
                                             <tr>
@@ -116,6 +132,7 @@
                                                     </form>
                                                 </td>
                                                 <td>{{ $subcategory->products_count }}</td>
+                                                <td>{{ $subcategory->sort_order }}</td>
                                                 <td><x-status-badge :status="$subcategory->status" /></td>
                                                 <td>
                                                     <div class="table-actions" style="justify-content:flex-end">
@@ -135,6 +152,10 @@
                                 </table>
                             </div>
                         @endif
+                    </div>
+
+                    <div class="card-foot">
+                        {{ $subcategories->links('components.pagination') }}
                     </div>
 
                     <div class="card-foot">

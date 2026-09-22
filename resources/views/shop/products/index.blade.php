@@ -5,48 +5,39 @@
 @section('page-title', 'Products')
 
 @section('content')
-    <div class="card mb-2">
-        <form method="GET" action="{{ route('shop.products.index') }}" data-filter-form>
-            <div class="card-body">
-                <div class="grid grid-3" style="align-items:end">
-                    <div class="field" style="margin:0">
-                        <label for="q">Search your products</label>
-                        <input id="q" type="search" name="q" value="{{ request('q') }}" placeholder="Name or title">
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label for="status">Status</label>
-                        <select id="status" name="status" data-autosubmit>
-                            <option value="">All statuses</option>
-                            <option value="published" @selected(request('status') === 'published')>Published</option>
-                            <option value="draft" @selected(request('status') === 'draft')>Draft</option>
-                        </select>
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label for="category_id">Category</label>
-                        <select id="category_id" name="category_id" data-autosubmit>
-                            <option value="">All categories</option>
-                            @foreach ($categories as $category)
-                                <option value="{{ $category->id }}" @selected((int) request('category_id') === $category->id)>{{ $category->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="btn-row mt-2">
-                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-                    <a href="{{ route('shop.products.index') }}" class="btn btn-ghost btn-sm">Reset</a>
-                </div>
-            </div>
-        </form>
-    </div>
+    <x-dt-toolbar :paginator="$products" placeholder="Name or title…" search-label="Search your products">
+        <div class="dt-field">
+            <label class="sr-only" for="status">Status</label>
+            <select id="status" name="status" data-autosubmit>
+                <option value="">All statuses</option>
+                <option value="published" @selected(request('status') === 'published')>Published</option>
+                <option value="draft" @selected(request('status') === 'draft')>Draft</option>
+            </select>
+        </div>
+        <div class="dt-field">
+            <label class="sr-only" for="category_id">Category</label>
+            <select id="category_id" name="category_id" data-autosubmit>
+                <option value="">All categories</option>
+                @foreach ($categories as $category)
+                    <option value="{{ $category->id }}" @selected((int) request('category_id') === $category->id)>{{ $category->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <a href="{{ route('shop.products.index') }}" class="btn btn-ghost btn-sm">Reset</a>
+        <a href="{{ route('shop.products.create') }}" class="btn btn-accent btn-sm">+ Add product</a>
+    </x-dt-toolbar>
 
-    <div class="card">
+    <div class="card" id="products-region" data-dt-region>
         <div class="card-head">
-            <h2>{{ $products->total() }} {{ \Illuminate\Support\Str::plural('product', $products->total()) }}</h2>
-            <a href="{{ route('shop.products.create') }}" class="btn btn-accent btn-sm">+ Add product</a>
+            <h2>Products</h2>
+        </div>
+
+        <div class="card-body" style="padding:0 20px 4px">
+            <x-dt-info :paginator="$products" label="product" :q="request('q')" />
         </div>
 
         @if ($products->isEmpty())
-            <x-empty-state title="No products found" glyph="▦"
+            <x-empty-state title="No products matched" glyph="▦"
                 message="Adjust the filters, or create your first listing.">
                 <a href="{{ route('shop.products.create') }}" class="btn btn-primary btn-sm mt-2">Create a product</a>
             </x-empty-state>
@@ -55,12 +46,13 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Product</th>
+                            <x-dt-th col="name">Product</x-dt-th>
                             <th>Category</th>
-                            <th>Price</th>
+                            <x-dt-th col="price">Price</x-dt-th>
                             <th>Images</th>
-                            <th>Status</th>
+                            <x-dt-th col="status">Status</x-dt-th>
                             <th class="text-right">Actions</th>
+                            <x-dt-th col="created_at">Added</x-dt-th>
                         </tr>
                     </thead>
                     <tbody>
@@ -108,6 +100,7 @@
                                         </form>
                                     </div>
                                 </td>
+                                <td class="nowrap">{{ $product->created_at?->format('d M Y') }}</td>
                             </tr>
                         @endforeach
                     </tbody>

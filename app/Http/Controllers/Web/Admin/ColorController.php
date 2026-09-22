@@ -7,6 +7,7 @@ use App\Models\Color;
 use App\Models\Product;
 use App\Services\Audit\AuditLogger;
 use App\Services\Catalog\ProductSearchProjector;
+use App\Support\DataTable;
 use App\Support\NameNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,13 +18,30 @@ use Illuminate\View\View;
 
 class ColorController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $sort = DataTable::sortable($request, ['name', 'products_count', 'is_active', 'created_at']);
+        $direction = DataTable::direction($request);
+
         $colors = Color::query()
             ->withCount('products')
-            ->orderBy('sort_order')
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $like = DataTable::like($request->input('q'));
+
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('name', 'like', $like)->orWhere('hex', 'like', $like);
+                });
+            })
+            ->when(in_array($request->input('state'), ['active', 'inactive'], true),
+                fn ($query) => $query->where('is_active', $request->input('state') === 'active'))
+            ->when($sort === 'name', fn ($query) => $query->orderBy('name', $direction))
+            ->when($sort === 'products_count', fn ($query) => $query->orderBy('products_count', $direction))
+            ->when($sort === 'is_active', fn ($query) => $query->orderBy('is_active', $direction))
+            ->when($sort === 'created_at', fn ($query) => $query->orderBy('created_at', $direction))
+            ->when($sort === 'created_at' || $sort === null, fn ($query) => $query->orderBy('sort_order'))
             ->orderBy('name')
-            ->get();
+            ->paginate(DataTable::perPage($request))
+            ->withQueryString();
 
         return view('admin.colors.index', [
             'colors' => $colors,

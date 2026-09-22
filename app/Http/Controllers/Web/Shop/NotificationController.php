@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Web\Shop\Concerns\ResolvesShop;
 use App\Models\Conversation;
 use App\Models\Notification;
+use App\Support\DataTable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,8 +22,15 @@ class NotificationController extends Controller
         $notifications = Notification::query()
             ->where('recipient_type', 'shop')
             ->where('recipient_id', $shop->id)
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $like = DataTable::like($request->input('q'));
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('title', 'like', $like)->orWhere('body', 'like', $like);
+                });
+            })
             ->orderByDesc('id')
-            ->paginate(20);
+            ->paginate(DataTable::perPage($request, 20))
+            ->withQueryString();
 
         return view('shop.notifications', compact('shop', 'notifications'));
     }

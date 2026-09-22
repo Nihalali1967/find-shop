@@ -7,6 +7,7 @@ use App\Models\Shop;
 use App\Models\ShopInvitation;
 use App\Services\Audit\AuditLogger;
 use App\Services\Shops\ShopService;
+use App\Support\DataTable;
 use App\Support\NameNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,10 +17,29 @@ use Illuminate\View\View;
 
 class InvitationController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $invitations = ShopInvitation::query()
+            ->with('creator', 'shop')
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $like = DataTable::like($request->input('q'));
+
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('name', 'like', $like)->orWhere('intended_phone', 'like', $like);
+                });
+            })
+            ->when($request->input('state') === 'pending',
+                fn ($query) => $query->whereNull('claimed_at')->where('expires_at', '>', now()))
+            ->when($request->input('state') === 'claimed',
+                fn ($query) => $query->whereNotNull('claimed_at'))
+            ->when($request->input('state') === 'expired',
+                fn ($query) => $query->whereNull('claimed_at')->where('expires_at', '<=', now()))
+            ->latest('id')
+            ->paginate(DataTable::perPage($request, 15))
+            ->withQueryString();
+
         return view('admin.shops.invitations', [
-            'invitations' => ShopInvitation::with('creator', 'shop')->latest('id')->paginate(15),
+            'invitations' => $invitations,
             'intendedStatuses' => Shop::STATUSES,
         ]);
     }

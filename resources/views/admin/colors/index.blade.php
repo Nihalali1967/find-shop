@@ -5,24 +5,41 @@
 @section('page-title', 'Colors')
 
 @section('content')
+    <x-dt-toolbar :paginator="$colors" placeholder="Search name or hex…" search-label="Search colors">
+        <div class="dt-field">
+            <label class="sr-only" for="dt-state">State</label>
+            <select id="dt-state" name="state" data-autosubmit>
+                <option value="">All states</option>
+                <option value="active" @selected(request('state') === 'active')>Active</option>
+                <option value="inactive" @selected(request('state') === 'inactive')>Inactive</option>
+            </select>
+        </div>
+    </x-dt-toolbar>
+
     <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:start">
-        <div class="card">
+        <div class="card" id="colors-region" data-dt-region>
             <div class="card-head">
                 <h2>Palette</h2>
-                <span class="muted" style="font-size:.84rem">{{ $colors->count() }} {{ \Illuminate\Support\Str::plural('color', $colors->count()) }}</span>
+            </div>
+
+            <div class="card-body" style="padding:0 20px 2px">
+                <x-dt-info :paginator="$colors" label="color" :q="request('q')" />
             </div>
 
             @if ($colors->isEmpty())
-                <x-empty-state title="No colors yet" glyph="◍" message="Add the first swatch with the form on the right." />
+                <x-empty-state title="No colors matched" glyph="◍"
+                    message="Try a different search or clear the filters.">
+                    <a href="{{ route('admin.colors.index') }}" class="btn btn-ghost btn-sm mt-2">Clear filters</a>
+                </x-empty-state>
             @else
                 <div class="table-wrap">
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>Swatch</th>
-                                <th>Name</th>
-                                <th>Products</th>
-                                <th>Status</th>
+                                <x-dt-th col="name">Name</x-dt-th>
+                                <x-dt-th col="products_count">Products</x-dt-th>
+                                <x-dt-th col="is_active">Status</x-dt-th>
                                 <th class="text-right">Actions</th>
                             </tr>
                         </thead>
@@ -89,9 +106,7 @@
             @endif
 
             <div class="card-foot">
-                <p class="hint mb-0">
-                    Inactive colors disappear from product forms, filters and the public palette, but stay on existing listings.
-                </p>
+                {{ $colors->links('components.pagination') }}
             </div>
         </div>
 
@@ -147,6 +162,13 @@
                 <p class="hint mb-0">
                     {{ $inUseCount }} {{ \Illuminate\Support\Str::plural('product', $inUseCount) }} currently reference at least one color.
                     Deleting an attached color is blocked; deactivate it instead.
+                </p>
+            </div>
+
+            <div class="card card-pad">
+                <h3>Notes</h3>
+                <p class="hint mb-0">
+                    Inactive colors disappear from product forms, filters and the public palette, but stay on existing listings.
                 </p>
             </div>
         </div>

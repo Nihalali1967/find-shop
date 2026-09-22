@@ -5,41 +5,32 @@
 @section('page-title', 'Shops')
 
 @section('content')
-    <div class="card mb-2">
-        <form method="GET" action="{{ route('admin.shops.index') }}" data-filter-form>
-            <div class="card-body">
-                <div class="grid grid-3" style="align-items:end">
-                    <div class="field" style="margin:0">
-                        <label for="q">Search</label>
-                        <input id="q" type="search" name="q" value="{{ request('q') }}" placeholder="Shop name, owner phone, pincode">
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label for="status">Status</label>
-                        <select id="status" name="status" data-autosubmit>
-                            <option value="">All statuses</option>
-                            @foreach ($statuses as $status)
-                                <option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label for="locality">Locality</label>
-                        <input id="locality" type="text" name="locality" value="{{ request('locality') }}">
-                    </div>
-                </div>
-                <div class="btn-row mt-2">
-                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-                    <a href="{{ route('admin.shops.index') }}" class="btn btn-ghost btn-sm">Reset</a>
-                    <a href="{{ route('admin.invitations.index') }}" class="btn btn-accent btn-sm">+ Create invitation</a>
-                </div>
-            </div>
-        </form>
-    </div>
+    <x-dt-toolbar :paginator="$shops" placeholder="Shop name, owner phone, pincode…" search-label="Search shops">
+        <div class="dt-field">
+            <label class="sr-only" for="status">Status</label>
+            <select id="status" name="status" data-autosubmit>
+                <option value="">All statuses</option>
+                @foreach ($statuses as $status)
+                    <option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="dt-field">
+            <label class="sr-only" for="locality">Locality</label>
+            <input id="locality" type="text" name="locality" value="{{ request('locality') }}" placeholder="Locality" style="max-width:150px">
+        </div>
+        <a href="{{ route('admin.shops.index') }}" class="btn btn-ghost btn-sm">Reset</a>
+        <a href="{{ route('admin.invitations.index') }}" class="btn btn-accent btn-sm">+ Create invitation</a>
+    </x-dt-toolbar>
 
-    <div class="card">
+    <div class="card" id="shops-region" data-dt-region>
         <div class="card-head">
-            <h2>{{ $shops->total() }} {{ \Illuminate\Support\Str::plural('shop', $shops->total()) }}</h2>
+            <h2>Shops</h2>
             <span class="muted" style="font-size:.85rem">Soft-deleted shops are hidden from this list</span>
+        </div>
+
+        <div class="card-body" style="padding:0 20px 4px">
+            <x-dt-info :paginator="$shops" label="shop" :q="request('q')" />
         </div>
 
         @if ($shops->isEmpty())
@@ -49,7 +40,12 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Shop</th><th>Owner phone</th><th>Location</th><th>Products</th><th>Status</th><th class="text-right">Actions</th>
+                            <x-dt-th col="name">Shop</x-dt-th>
+                            <th>Owner phone</th>
+                            <th>Location</th>
+                            <x-dt-th col="products_count">Products</x-dt-th>
+                            <x-dt-th col="status">Status</x-dt-th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>

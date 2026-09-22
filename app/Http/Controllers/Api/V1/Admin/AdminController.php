@@ -12,6 +12,7 @@ use App\Models\Subcategory;
 use App\Services\Audit\AuditLogger;
 use App\Services\Catalog\ProductSearchProjector;
 use App\Services\Shops\ShopService;
+use App\Support\DataTable;
 use App\Support\NameNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -228,19 +229,34 @@ class AdminController extends Controller
         $colors = Color::query()
             ->withCount('products')
             ->when($request->boolean('include_inactive') === false, fn ($q) => $q->where('is_active', true))
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $like = DataTable::like($request->input('q'));
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('name', 'like', $like)->orWhere('hex', 'like', $like);
+                });
+            })
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get();
+            ->paginate(DataTable::perPage($request, 15))
+            ->withQueryString();
 
-        return response()->json(['data' => $colors->map(fn (Color $color) => [
-            'id' => $color->id,
-            'name' => $color->name,
-            'hex' => $color->hex,
-            'is_multicolor' => $color->is_multicolor,
-            'is_active' => $color->is_active,
-            'sort_order' => $color->sort_order,
-            'products_count' => $color->products_count,
-        ])]);
+        return response()->json([
+            'data' => $colors->getCollection()->map(fn (Color $color) => [
+                'id' => $color->id,
+                'name' => $color->name,
+                'hex' => $color->hex,
+                'is_multicolor' => $color->is_multicolor,
+                'is_active' => $color->is_active,
+                'sort_order' => $color->sort_order,
+                'products_count' => $color->products_count,
+            ]),
+            'meta' => [
+                'current_page' => $colors->currentPage(),
+                'last_page' => $colors->lastPage(),
+                'per_page' => $colors->perPage(),
+                'total' => $colors->total(),
+            ],
+        ]);
     }
 
     public function storeColor(Request $request): JsonResponse

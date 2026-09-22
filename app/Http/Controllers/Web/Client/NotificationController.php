@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Support\DataTable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,8 +16,15 @@ class NotificationController extends Controller
         $notifications = Notification::query()
             ->where('recipient_type', 'user')
             ->where('recipient_id', $request->user()->id)
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $like = DataTable::like($request->input('q'));
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('title', 'like', $like)->orWhere('body', 'like', $like);
+                });
+            })
             ->orderByDesc('id')
-            ->paginate(20);
+            ->paginate(DataTable::perPage($request, 20))
+            ->withQueryString();
 
         return view('client.notifications.index', compact('notifications'));
     }
