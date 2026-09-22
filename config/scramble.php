@@ -150,7 +150,6 @@ return [
 
     'middleware' => [
         'web',
-        'auth:admin',
     ],
 
     'extensions' => [],
