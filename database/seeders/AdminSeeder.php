@@ -26,3 +26,4 @@ class AdminSeeder extends Seeder
         $this->command?->info("Admin ready: {$email}");
     }
 }
+
