@@ -150,7 +150,7 @@ return [
 
     'middleware' => [
         'web',
-        RestrictedDocsAccess::class,
+        'auth:admin',
     ],
 
     'extensions' => [],

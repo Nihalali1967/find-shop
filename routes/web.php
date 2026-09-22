@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Web\Admin\ColorController as AdminColorController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Web\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Web\Admin\ShopController as AdminShopController;
@@ -142,5 +143,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/categories/{category}/subcategories', [AdminTaxonomyController::class, 'storeSubcategory'])->name('subcategories.store');
         Route::patch('/subcategories/{subcategory}', [AdminTaxonomyController::class, 'updateSubcategory'])->name('subcategories.update');
         Route::delete('/subcategories/{subcategory}', [AdminTaxonomyController::class, 'destroySubcategory'])->name('subcategories.destroy');
+
+        Route::get('/colors', [AdminColorController::class, 'index'])->name('colors.index');
+        Route::post('/colors', [AdminColorController::class, 'store'])->name('colors.store');
+        Route::patch('/colors/{color}', [AdminColorController::class, 'update'])->name('colors.update');
+        Route::delete('/colors/{color}', [AdminColorController::class, 'destroy'])->name('colors.destroy');
     });
 });

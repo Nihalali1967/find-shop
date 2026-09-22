@@ -744,6 +744,36 @@ table.table tbody tr:last-child td {
     background: conic-gradient(from 0deg, #d64545, #e9c46a, #4c7a5a, #3d6fb4, #7b5ea7, #d64545);
 }
 
+.swatch-lg {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+}
+
+/* Preset swatches used by the admin palette when no hex is stored. */
+.swatch-white { background: #ffffff; }
+.swatch-black { background: #111111; }
+.swatch-gray { background: #8e8e93; }
+.swatch-silver { background: linear-gradient(135deg, #e8eaee 0%, #b9bec8 55%, #d9dde3 100%); }
+.swatch-gold { background: linear-gradient(135deg, #e6c34d 0%, #b78d1d 100%); }
+.swatch-transparent {
+    background:
+        linear-gradient(45deg, #ddd 25%, transparent 25%, transparent 75%, #ddd 75%),
+        linear-gradient(45deg, #ddd 25%, transparent 25%, transparent 75%, #ddd 75%),
+        #ffffff;
+    background-size: 8px 8px;
+    background-position: 0 0, 4px 4px;
+}
+.swatch-beige { background: #e7d8c9; }
+.swatch-brown { background: #8b5a2b; }
+.swatch-red { background: #d64545; }
+.swatch-orange { background: #e8883a; }
+.swatch-yellow { background: #e9c46a; }
+.swatch-green { background: #4c7a5a; }
+.swatch-blue { background: #3d6fb4; }
+.swatch-purple { background: #7b5ea7; }
+.swatch-pink { background: #d98bb4; }
+
 .catalog-toolbar {
     display: flex;
     align-items: center;

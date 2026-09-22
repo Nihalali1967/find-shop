@@ -34,6 +34,9 @@
             <a href="{{ route('admin.taxonomy.index') }}" class="{{ $nav === 'taxonomy' ? 'is-active' : '' }}">
                 <span class="ico" aria-hidden="true">⌗</span> Categories
             </a>
+            <a href="{{ route('admin.colors.index') }}" class="{{ $nav === 'colors' ? 'is-active' : '' }}">
+                <span class="ico" aria-hidden="true">◍</span> Colors
+            </a>
 
             <div class="group-label">Session</div>
             <a href="{{ route('client.home') }}">

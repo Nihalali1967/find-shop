@@ -92,5 +92,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/admin/categories/{category}/subcategories', [ApiAdminController::class, 'storeSubcategory']);
         Route::patch('/admin/subcategories/{subcategory}', [ApiAdminController::class, 'updateSubcategory']);
         Route::delete('/admin/subcategories/{subcategory}', [ApiAdminController::class, 'deleteSubcategory']);
+
+        Route::get('/admin/colors', [ApiAdminController::class, 'colors']);
+        Route::post('/admin/colors', [ApiAdminController::class, 'storeColor']);
+        Route::patch('/admin/colors/{color}', [ApiAdminController::class, 'updateColor']);
+        Route::delete('/admin/colors/{color}', [ApiAdminController::class, 'deleteColor']);
     });
 });

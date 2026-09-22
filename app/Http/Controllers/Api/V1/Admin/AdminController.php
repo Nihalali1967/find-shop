@@ -4,17 +4,18 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Color;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopInvitation;
 use App\Models\Subcategory;
 use App\Services\Audit\AuditLogger;
+use App\Services\Catalog\ProductSearchProjector;
 use App\Services\Shops\ShopService;
 use App\Support\NameNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -220,6 +221,154 @@ class AdminController extends Controller
         $subcategory->update($data);
 
         return response()->json(['data' => ['id' => $subcategory->id, 'name' => $subcategory->name, 'status' => $subcategory->status]]);
+    }
+
+    public function colors(Request $request): JsonResponse
+    {
+        $colors = Color::query()
+            ->withCount('products')
+            ->when($request->boolean('include_inactive') === false, fn ($q) => $q->where('is_active', true))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $colors->map(fn (Color $color) => [
+            'id' => $color->id,
+            'name' => $color->name,
+            'hex' => $color->hex,
+            'is_multicolor' => $color->is_multicolor,
+            'is_active' => $color->is_active,
+            'sort_order' => $color->sort_order,
+            'products_count' => $color->products_count,
+        ])]);
+    }
+
+    public function storeColor(Request $request): JsonResponse
+    {
+        $data = $this->validatedColor($request);
+
+        $this->assertUniqueColorName($data['name']);
+
+        $color = Color::create([
+            'name' => NameNormalizer::normalize($data['name']),
+            'hex' => $data['hex'] ?? null,
+            'swatch_class' => $data['is_multicolor'] ? 'swatch-multicolor' : null,
+            'is_multicolor' => $data['is_multicolor'],
+            'is_active' => $data['is_active'],
+            'sort_order' => $data['sort_order'],
+        ]);
+
+        AuditLogger::log('color.created', subject: $color, actor: $request->user(), ip: $request->ip());
+
+        return response()->json(['data' => $this->colorPayload($color, 0)], 201);
+    }
+
+    public function updateColor(Request $request, Color $color): JsonResponse
+    {
+        $data = $this->validatedColor($request);
+
+        $this->assertUniqueColorName($data['name'], $color->id);
+
+        $originalNameKey = $color->name_key;
+        $productCount = $color->products()->count();
+
+        $color->update([
+            'name' => NameNormalizer::normalize($data['name']),
+            'hex' => $data['is_multicolor'] ? null : ($data['hex'] ?? null),
+            'swatch_class' => $data['is_multicolor'] ? 'swatch-multicolor' : null,
+            'is_multicolor' => $data['is_multicolor'],
+            'is_active' => $data['is_active'],
+            'sort_order' => $data['sort_order'],
+        ]);
+
+        // Color names are part of the search vocabulary; keep projections consistent.
+        if ($originalNameKey !== $color->name_key && $productCount > 0) {
+            DB::transaction(function () use ($color) {
+                $projector = app(ProductSearchProjector::class);
+
+                $color->products()->chunkById(200, function ($products) use ($projector) {
+                    foreach ($products as $product) {
+                        $projector->sync($product);
+                    }
+                });
+            });
+        }
+
+        AuditLogger::log('color.updated', subject: $color, actor: $request->user(),
+            meta: ['name' => $color->name, 'is_active' => $color->is_active], ip: $request->ip());
+
+        return response()->json(['data' => $this->colorPayload($color, $productCount)]);
+    }
+
+    public function deleteColor(Request $request, Color $color): JsonResponse
+    {
+        $productCount = $color->products()->count();
+
+        if ($productCount > 0) {
+            return response()->json([
+                'message' => "Reassign the {$productCount} product(s) using this color before deleting it.",
+                'code' => 'COLOR_IN_USE',
+                'products_count' => $productCount,
+            ], 409);
+        }
+
+        AuditLogger::log('color.deleted', subject: $color, actor: $request->user(), ip: $request->ip());
+        $color->delete();
+
+        return response()->json(['data' => ['deleted' => true]]);
+    }
+
+    /**
+     * @return array{name:string,hex:?string,is_multicolor:bool,is_active:bool,sort_order:int}
+     */
+    private function validatedColor(Request $request): array
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:60'],
+            'hex' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'is_multicolor' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+        ]);
+
+        $data['is_multicolor'] = (bool) ($data['is_multicolor'] ?? false);
+        $data['is_active'] = (bool) ($data['is_active'] ?? true);
+        $data['sort_order'] ??= 0;
+
+        if ($data['is_multicolor']) {
+            $data['hex'] = null;
+        }
+
+        return $data;
+    }
+
+    private function assertUniqueColorName(string $name, ?int $exceptId = null): void
+    {
+        $key = NameNormalizer::key($name);
+
+        $exists = Color::where('name_key', $key)
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages(['name' => 'A color with that name already exists.']);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function colorPayload(Color $color, int $productCount): array
+    {
+        return [
+            'id' => $color->id,
+            'name' => $color->name,
+            'hex' => $color->hex,
+            'is_multicolor' => $color->is_multicolor,
+            'is_active' => $color->is_active,
+            'sort_order' => $color->sort_order,
+            'products_count' => $productCount,
+        ];
     }
 
     public function deleteSubcategory(Request $request, Subcategory $subcategory): JsonResponse
