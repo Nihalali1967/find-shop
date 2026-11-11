@@ -204,6 +204,68 @@ class CatalogController extends Controller
     }
 
     /**
+     * List all active shops
+     *
+     * @queryParam q string Search by shop name. Example: stonecraft
+     * @queryParam locality string Filter by locality. Example: Hosur Road
+     * @queryParam pincode string Filter by pincode. Example: 560100
+     * @queryParam sort string Sort order. Must be one of: newest, name. Example: newest
+     * @queryParam per_page int Items per page (1-48). Example: 12
+     * @response 200 {
+     *   "data": [
+     *     {
+     *       "id": 1,
+     *       "name": "Shop Name",
+     *       "locality": "City",
+     *       "pincode": "123456",
+     *       "status": "active",
+     *       "product_count": 10,
+     *       "joined_at": "2024-01-01T00:00:00Z"
+     *     }
+     *   ]
+     * }
+     */
+    public function shops(Request $request): JsonResponse
+    {
+        $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'locality' => ['nullable', 'string', 'max:100'],
+            'pincode' => ['nullable', 'string', 'max:10'],
+            'sort' => ['nullable', 'in:newest,name'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:48'],
+        ]);
+
+        $shops = Shop::query()->visible()
+            ->withCount(['products as product_count' => fn ($q) => $q->where('status', Product::STATUS_PUBLISHED)])
+            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%'.$this->escapeLike($request->string('q')).'%'))
+            ->when($request->filled('locality'), fn ($q) => $q->where('locality', 'like', '%'.$this->escapeLike($request->string('locality')).'%'))
+            ->when($request->filled('pincode'), fn ($q) => $q->where('pincode', $request->string('pincode')))
+            ->when(
+                $request->input('sort') === 'name',
+                fn ($q) => $q->orderBy('name')->orderBy('id'),
+                fn ($q) => $q->latest('id')
+            )
+            ->paginate((int) $request->input('per_page', 12))
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $shops->getCollection()->map(fn (Shop $shop) => $this->shopPayload($shop)),
+            'meta' => [
+                'current_page' => $shops->currentPage(),
+                'last_page' => $shops->lastPage(),
+                'per_page' => $shops->perPage(),
+                'total' => $shops->total(),
+            ],
+            'links' => [
+                'first' => $shops->url(1),
+                'last' => $shops->url($shops->lastPage()),
+                'prev' => $shops->previousPageUrl(),
+                'next' => $shops->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    /**
      * Get shop details
      *
      * @urlParam shop int required Shop ID. Example: 1
@@ -224,16 +286,68 @@ class CatalogController extends Controller
     {
         abort_unless($shop->isActive(), 404);
 
-        return response()->json([
-            'data' => [
-                'id' => $shop->id,
-                'name' => $shop->name,
-                'locality' => $shop->locality,
-                'pincode' => $shop->pincode,
-                'status' => $shop->status,
-                'product_count' => $shop->products()->where('status', Product::STATUS_PUBLISHED)->count(),
-                'joined_at' => $shop->created_at?->toIso8601String(),
-            ],
+        return response()->json(['data' => $this->shopPayload($shop->loadCount([
+            'products as product_count' => fn ($q) => $q->where('status', Product::STATUS_PUBLISHED),
+        ]))]);
+    }
+
+    /**
+     * Get published products belonging to a shop
+     *
+     * @urlParam shop int required Shop ID. Example: 1
+     * @queryParam sort string Sort order. Must be one of: newest, oldest, price_asc, price_desc, name_asc. Example: newest
+     * @queryParam per_page int Items per page (1-48). Example: 12
+     * @response 200 {
+     *   "data": [...],
+     *   "meta": { "current_page": 1, "last_page": 1, "per_page": 12, "total": 3 }
+     * }
+     * @response 404 Shop not found or inactive
+     */
+    public function shopProducts(Request $request, Shop $shop, ProductSearch $search): JsonResponse
+    {
+        abort_unless($shop->isActive(), 404);
+
+        $request->validate([
+            'sort' => ['nullable', 'in:'.implode(',', array_diff(ProductSearch::SORTS, ['relevance']))],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:48'],
         ]);
+
+        $filters = [
+            'shop_id' => $shop->id,
+            'sort' => $request->input('sort'),
+        ];
+
+        $paginator = $search->query($filters, (int) $request->input('per_page', 12));
+
+        return ProductResource::collection($paginator)->additional([
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'sort' => $filters['sort'] ?? 'newest',
+            ],
+        ])->response();
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function shopPayload(Shop $shop): array
+    {
+        return [
+            'id' => $shop->id,
+            'name' => $shop->name,
+            'locality' => $shop->locality,
+            'pincode' => $shop->pincode,
+            'status' => $shop->status,
+            'product_count' => $shop->product_count ?? $shop->products()->where('status', Product::STATUS_PUBLISHED)->count(),
+            'joined_at' => $shop->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 }
