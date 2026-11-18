@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Services\Sms\FakeSmsGateway;
 use App\Services\Sms\LogSmsGateway;
 use App\Services\Sms\SmsGateway;
+use App\Support\ApiDocs\ApiDocSections;
 use App\Support\Money;
+use Dedoc\Scramble\Scramble;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
@@ -42,5 +44,10 @@ class AppServiceProvider extends ServiceProvider
 
         Blade::if('admin', fn () => auth('admin')->check());
         Schema::defaultStringLength(191);
+
+        // API docs (/docs/api): Super Admin / Company Admin / User sections, split by Public vs Token Required.
+        Scramble::configure()
+            ->withOperationTransformers(ApiDocSections::operation(...))
+            ->withDocumentTransformers(ApiDocSections::document(...));
     }
 }
