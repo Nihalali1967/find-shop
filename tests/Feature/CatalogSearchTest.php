@@ -115,6 +115,32 @@ class CatalogSearchTest extends TestCase
         $this->getJson('/api/v1/shops/nearby?lng=77.5946')->assertStatus(422);
     }
 
+    public function test_popular_products_rank_by_enquiries_and_views(): void
+    {
+        $granite = Product::where('name', 'Black galaxy granite')->firstOrFail();
+        $led = Product::where('name', 'Linear LED profile')->firstOrFail();
+
+        // LED: 3 distinct viewers (score 3). Repeat views by the same viewer are counted once.
+        foreach (['1.1.1.1', '2.2.2.2', '3.3.3.3', '3.3.3.3'] as $ip) {
+            $this->withServerVariables(['REMOTE_ADDR' => $ip])->getJson("/api/v1/products/{$led->id}")->assertOk();
+        }
+
+        // Granite: 1 enquiry (score 5) beats 3 views.
+        \App\Models\Conversation::create([
+            'product_id' => $granite->id,
+            'client_id' => User::factory()->create()->id,
+            'shop_id' => $this->shop->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/products/popular')->assertOk();
+
+        $this->assertSame(['Black galaxy granite', 'Linear LED profile', 'Italian marble'], collect($response->json('data'))->pluck('name')->all());
+        $this->assertSame(['score' => 5, 'views' => 0, 'enquiries' => 1], $response->json('data.0.popularity'));
+        $this->assertSame(['score' => 3, 'views' => 3, 'enquiries' => 0], $response->json('data.1.popularity'));
+
+        $this->getJson('/api/v1/products/popular?limit=1')->assertOk()->assertJsonCount(1, 'data');
+    }
+
     /**
      * @return array<int,string>
      */

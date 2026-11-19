@@ -24,6 +24,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/products', [ApiCatalogController::class, 'products']);
     Route::get('/products/new-arrivals', [ApiCatalogController::class, 'newArrivals']);
+    Route::get('/products/popular', [ApiCatalogController::class, 'popularProducts']);
     Route::get('/products/{product}', [ApiCatalogController::class, 'product']);
     Route::get('/shops', [ApiCatalogController::class, 'shops']);
     Route::get('/shops/nearby', [ApiCatalogController::class, 'nearbyShops']);

@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Subcategory;
 use App\Models\Unit;
+use App\Services\Catalog\ProductPopularity;
 use App\Services\Catalog\ProductSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -212,6 +213,49 @@ class CatalogController extends Controller
     }
 
     /**
+     * Popular products: ranked by buyer enquiries (chats) and product views in the last N days
+     *
+     * Score = enquiries × 5 + views. Products with no activity follow, newest first.
+     *
+     * @queryParam limit int Number of products (1-48). Example: 10
+     * @queryParam days int Look-back window in days (1-365). Example: 30
+     * @queryParam category_id int Filter by category ID. Example: 1
+     * @response 200 {
+     *   "data": [ { "id": 1, "name": "...", "popularity": { "score": 23, "views": 13, "enquiries": 2 } } ],
+     *   "meta": { "count": 10, "limit": 10, "days": 30 }
+     * }
+     */
+    public function popularProducts(Request $request, ProductPopularity $popularity): JsonResponse
+    {
+        $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:48'],
+            'days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ]);
+
+        $limit = (int) $request->input('limit', 10);
+        $days = (int) $request->input('days', 30);
+
+        $products = $popularity->query($days)
+            ->when($request->filled('category_id'), fn ($q) => $q->whereHas(
+                'subcategory', fn ($s) => $s->where('category_id', $request->integer('category_id'))
+            ))
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $products->map(fn (Product $p) => (new ProductResource($p))->resolve($request) + [
+                'popularity' => [
+                    'score' => (int) $p->enquiries_count * ProductPopularity::ENQUIRY_WEIGHT + (int) $p->views_count,
+                    'views' => (int) $p->views_count,
+                    'enquiries' => (int) $p->enquiries_count,
+                ],
+            ]),
+            'meta' => ['count' => $products->count(), 'limit' => $limit, 'days' => $days],
+        ]);
+    }
+
+    /**
      * Get a single product by ID
      *
      * @urlParam product int required Product ID. Example: 1
@@ -226,13 +270,15 @@ class CatalogController extends Controller
      * }
      * @response 404 Product not found
      */
-    public function product(Product $product): JsonResponse
+    public function product(Request $request, Product $product, ProductPopularity $popularity): JsonResponse
     {
         abort_unless($product->status === Product::STATUS_PUBLISHED, 404);
         $product->load(['shop', 'subcategory.category', 'unit', 'colors', 'images']);
 
         abort_unless($product->shop?->isActive(), 404);
         abort_unless($product->subcategory?->status === 'active' && $product->subcategory?->category?->status === 'active', 404);
+
+        $popularity->recordView($product, $request);
 
         return response()->json(['data' => new ProductResource($product)]);
     }
