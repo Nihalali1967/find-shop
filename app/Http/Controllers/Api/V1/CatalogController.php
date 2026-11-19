@@ -178,6 +178,40 @@ class CatalogController extends Controller
     }
 
     /**
+     * New arrivals: the latest published products, newest first (default 10)
+     *
+     * @queryParam limit int Number of products to return (1-48). Example: 10
+     * @queryParam category_id int Filter by category ID. Example: 1
+     * @response 200 {
+     *   "data": [...],
+     *   "meta": { "count": 10, "limit": 10 }
+     * }
+     */
+    public function newArrivals(Request $request): JsonResponse
+    {
+        $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:48'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ]);
+
+        $limit = (int) $request->input('limit', 10);
+
+        $products = Product::query()->visible()
+            ->with(['shop', 'subcategory.category', 'unit', 'colors', 'images'])
+            ->when($request->filled('category_id'), fn ($q) => $q->whereHas(
+                'subcategory', fn ($s) => $s->where('category_id', $request->integer('category_id'))
+            ))
+            ->orderByDesc('products.created_at')
+            ->orderByDesc('products.id')
+            ->limit($limit)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => ['count' => $products->count(), 'limit' => $limit],
+        ])->response();
+    }
+
+    /**
      * Get a single product by ID
      *
      * @urlParam product int required Product ID. Example: 1
@@ -328,6 +362,76 @@ class CatalogController extends Controller
                 'sort' => $filters['sort'] ?? 'newest',
             ],
         ])->response();
+    }
+
+    /**
+     * Active shops near a location, closest first
+     *
+     * Only shops that have saved latitude/longitude are included.
+     *
+     * @queryParam lat float required User latitude. Example: 12.9716
+     * @queryParam lng float required User longitude. Example: 77.5946
+     * @queryParam radius_km float Search radius in km (0.5-100). Example: 10
+     * @queryParam limit int Max shops to return (1-50). Example: 20
+     * @response 200 {
+     *   "data": [
+     *     { "id": 1, "name": "Shop Name", "locality": "City", "pincode": "560100", "status": "active",
+     *       "product_count": 10, "joined_at": "...", "latitude": 12.97, "longitude": 77.59, "distance_km": 1.42 }
+     *   ],
+     *   "meta": { "lat": 12.9716, "lng": 77.5946, "radius_km": 10, "count": 1 }
+     * }
+     */
+    public function nearbyShops(Request $request): JsonResponse
+    {
+        $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+            'radius_km' => ['nullable', 'numeric', 'min:0.5', 'max:100'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $lat = (float) $request->input('lat');
+        $lng = (float) $request->input('lng');
+        $radius = (float) $request->input('radius_km', 10);
+        $limit = (int) $request->input('limit', 20);
+
+        // Cheap bounding-box prefilter in SQL; exact distance is computed below.
+        $latDelta = $radius / 111.045;
+        $lngDelta = $radius / (111.045 * max(cos(deg2rad($lat)), 0.01));
+
+        $shops = Shop::query()->visible()
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $latDelta, $lat + $latDelta])
+            ->whereBetween('longitude', [$lng - $lngDelta, $lng + $lngDelta])
+            ->withCount(['products as product_count' => fn ($q) => $q->where('status', Product::STATUS_PUBLISHED)])
+            ->get()
+            ->map(function (Shop $shop) use ($lat, $lng) {
+                $shop->distance_km = $this->distanceKm($lat, $lng, (float) $shop->latitude, (float) $shop->longitude);
+
+                return $shop;
+            })
+            ->filter(fn (Shop $shop) => $shop->distance_km <= $radius)
+            ->sortBy('distance_km')
+            ->take($limit)
+            ->values();
+
+        return response()->json([
+            'data' => $shops->map(fn (Shop $shop) => $this->shopPayload($shop) + [
+                'latitude' => (float) $shop->latitude,
+                'longitude' => (float) $shop->longitude,
+                'distance_km' => round($shop->distance_km, 2),
+            ]),
+            'meta' => ['lat' => $lat, 'lng' => $lng, 'radius_km' => $radius, 'count' => $shops->count()],
+        ]);
+    }
+
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return 6371 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     /**

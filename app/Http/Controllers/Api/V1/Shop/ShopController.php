@@ -92,6 +92,7 @@ class ShopController extends Controller
 
         return response()->json(['data' => $shop->only([
             'id', 'name', 'locality', 'pincode', 'address', 'gst_number', 'secondary_phone', 'email', 'status',
+            'latitude', 'longitude',
         ])]);
     }
 
@@ -106,10 +107,12 @@ class ShopController extends Controller
             'gst_number' => ['nullable', 'string', 'max:15'],
             'secondary_phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:160'],
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
         ]);
 
         $shop->fill($data)->save();
 
-        return response()->json(['data' => $shop->only(['id', 'name', 'locality', 'pincode', 'address'])]);
+        return response()->json(['data' => $shop->only(['id', 'name', 'locality', 'pincode', 'address', 'latitude', 'longitude'])]);
     }
 }
