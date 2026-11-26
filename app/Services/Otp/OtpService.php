@@ -5,6 +5,7 @@ namespace App\Services\Otp;
 use App\Exceptions\MarketplaceException;
 use App\Models\OtpChallenge;
 use App\Services\Sms\SmsGateway;
+use App\Services\Sms\VerifiesOtpRemotely;
 use App\Support\NameNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -41,10 +42,20 @@ class OtpService
             throw MarketplaceException::otpThrottled($latest?->resendSecondsRemaining() ?? $settings['resend_seconds']);
         }
 
-        // $code = $this->generateCode();
-        $code = '1234';
+        if ($this->gateway instanceof VerifiesOtpRemotely) {
+            // The provider generates and checks the code; store an unguessable placeholder hash.
+            $code = '';
+            $codeHash = Hash::make(Str::random(40));
+        } else {
+            // Fixed code for local development only; everywhere else it is random.
+            $code = app()->environment('local') ? '1234' : $this->generateCode();
+            $codeHash = Hash::make($code);
+        }
 
-        $challenge = DB::transaction(function () use ($phone, $purpose, $code, $ip, $userAgent, $settings) {
+        // Send before persisting so a provider failure leaves no challenge or resend cooldown behind.
+        $this->gateway->sendOtp($phone, $code, $purpose);
+
+        $challenge = DB::transaction(function () use ($phone, $purpose, $codeHash, $ip, $userAgent, $settings) {
             // Invalidate any still-active challenge for this phone/purpose.
             OtpChallenge::query()
                 ->where('phone', $phone)
@@ -56,7 +67,7 @@ class OtpService
                 'challenge_id' => (string) Str::uuid(),
                 'phone' => $phone,
                 'purpose' => $purpose,
-                'code_hash' => Hash::make($code),
+                'code_hash' => $codeHash,
                 'max_attempts' => $settings['max_attempts'],
                 'ip_address' => $ip,
                 'user_agent' => $userAgent ? substr($userAgent, 0, 255) : null,
@@ -67,8 +78,6 @@ class OtpService
 
         RateLimiter::hit($phoneKey, 3600);
         RateLimiter::hit($ipKey, 3600);
-
-        $this->gateway->sendOtp($phone, $code, $purpose);
 
         return $challenge;
     }
@@ -103,7 +112,7 @@ class OtpService
                 throw MarketplaceException::otpThrottled(0, 'Too many attempts. Request a new code.');
             }
 
-            if (! Hash::check($code, $challenge->code_hash)) {
+            if (! $this->codeMatches($challenge, $code)) {
                 // Signal a mismatch; the attempt is recorded outside this transaction
                 // so a rolled-back throw cannot erase the failed-attempt count.
                 return false;
@@ -142,6 +151,15 @@ class OtpService
         $max = (10 ** $length) - 1;
 
         return str_pad((string) random_int(0, $max), $length, '0', STR_PAD_LEFT);
+    }
+
+    protected function codeMatches(OtpChallenge $challenge, string $code): bool
+    {
+        if ($this->gateway instanceof VerifiesOtpRemotely) {
+            return $this->gateway->checkOtp($challenge->phone, $code);
+        }
+
+        return Hash::check($code, $challenge->code_hash);
     }
 
     protected function onResendCooldown(string $phone, string $purpose): bool

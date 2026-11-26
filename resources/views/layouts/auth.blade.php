@@ -18,6 +18,9 @@
         @if (session('status'))
             <div class="alert alert-success mb-2" role="status">{{ session('status') }}</div>
         @endif
+        @if (session('error'))
+            <div class="alert alert-danger mb-2" role="alert">{{ session('error') }}</div>
+        @endif
         @if ($errors->any())
             <div class="alert alert-danger mb-2" role="alert">
                 <div>

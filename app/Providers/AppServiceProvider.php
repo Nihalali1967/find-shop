@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Sms\FakeSmsGateway;
 use App\Services\Sms\LogSmsGateway;
 use App\Services\Sms\SmsGateway;
+use App\Services\Sms\TwilioVerifyGateway;
 use App\Support\ApiDocs\ApiDocSections;
 use App\Support\Money;
 use Dedoc\Scramble\Scramble;
@@ -23,11 +24,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SmsGateway::class, function () {
             $driver = config('services.sms.driver', 'log');
 
-            if ($driver === 'fake') {
-                return new FakeSmsGateway;
-            }
-
-            return new LogSmsGateway;
+            return match ($driver) {
+                'fake' => new FakeSmsGateway,
+                'twilio' => new TwilioVerifyGateway(
+                    (string) config('services.twilio.account_sid'),
+                    (string) config('services.twilio.auth_token'),
+                    (string) config('services.twilio.verify_sid'),
+                ),
+                default => new LogSmsGateway,
+            };
         });
     }
 
