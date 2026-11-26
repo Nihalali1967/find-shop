@@ -84,6 +84,8 @@ class ShopService
                     'gst_number' => $data['gst_number'] ?? null,
                     'secondary_phone' => isset($data['secondary_phone']) ? NameNormalizer::phone($data['secondary_phone']) : null,
                     'email' => $data['email'] ?? null,
+                    'latitude' => $data['latitude'] ?? null,
+                    'longitude' => $data['longitude'] ?? null,
                     'status' => $status,
                     'status_changed_at' => now(),
                 ]);

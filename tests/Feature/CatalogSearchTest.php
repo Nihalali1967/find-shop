@@ -71,6 +71,76 @@ class CatalogSearchTest extends TestCase
         return $product;
     }
 
+    public function test_new_arrivals_returns_latest_products_newest_first(): void
+    {
+        $older = $this->makeProduct('Old teak door', 'Solid teak door', 'Granite', ['Black']);
+        $older->forceFill(['created_at' => now()->subDays(30)])->save();
+        $newest = $this->makeProduct('Fresh onyx slab', 'Backlit onyx slab', 'Italian Marble', ['White']);
+        $newest->forceFill(['created_at' => now()->addMinute()])->save();
+
+        $response = $this->getJson('/api/v1/products/new-arrivals')->assertOk();
+        $this->assertSame('Fresh onyx slab', $response->json('data.0.name'));
+        $this->assertSame('Old teak door', collect($response->json('data'))->last()['name']);
+        $this->assertSame(10, $response->json('meta.limit'));
+
+        $this->getJson('/api/v1/products/new-arrivals?limit=2')->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson('/api/v1/products/new-arrivals?limit=500')->assertStatus(422);
+    }
+
+    public function test_nearby_shops_returns_shops_within_radius_closest_first(): void
+    {
+        // Bengaluru, ~0.5 km from the search point.
+        $this->shop->forceFill(['latitude' => 12.9760, 'longitude' => 77.5946])->save();
+
+        $far = $this->shop->replicate(['name', 'name_key', 'slug']);
+        $far->forceFill([
+            'owner_id' => User::factory()->create()->id,
+            'name' => 'Mysore Granite', 'name_key' => 'mysore granite', 'slug' => 'mysore-granite',
+            'latitude' => 12.2958, 'longitude' => 76.6394, // Mysuru, ~125 km away
+        ])->save();
+
+        $near2 = $this->shop->replicate(['name', 'name_key', 'slug']);
+        $near2->forceFill([
+            'owner_id' => User::factory()->create()->id,
+            'name' => 'Indiranagar Tiles', 'name_key' => 'indiranagar tiles', 'slug' => 'indiranagar-tiles',
+            'latitude' => 12.9784, 'longitude' => 77.6408, // ~5 km away
+        ])->save();
+
+        $response = $this->getJson('/api/v1/shops/nearby?lat=12.9716&lng=77.5946&radius_km=10')->assertOk();
+
+        $this->assertSame(['Stonecraft Studio', 'Indiranagar Tiles'], collect($response->json('data'))->pluck('name')->all());
+        $this->assertLessThan(1, $response->json('data.0.distance_km'));
+        $this->assertSame(3, $response->json('data.0.product_count'));
+
+        $this->getJson('/api/v1/shops/nearby?lng=77.5946')->assertStatus(422);
+    }
+
+    public function test_popular_products_rank_by_enquiries_and_views(): void
+    {
+        $granite = Product::where('name', 'Black galaxy granite')->firstOrFail();
+        $led = Product::where('name', 'Linear LED profile')->firstOrFail();
+
+        // LED: 3 distinct viewers (score 3). Repeat views by the same viewer are counted once.
+        foreach (['1.1.1.1', '2.2.2.2', '3.3.3.3', '3.3.3.3'] as $ip) {
+            $this->withServerVariables(['REMOTE_ADDR' => $ip])->getJson("/api/v1/products/{$led->id}")->assertOk();
+        }
+
+        // Granite: 1 enquiry (score 5) beats 3 views.
+        \App\Models\Conversation::create([
+            'product_id' => $granite->id,
+            'client_id' => User::factory()->create()->id,
+            'shop_id' => $this->shop->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/products/popular')->assertOk();
+
+        $this->assertSame(['Black galaxy granite', 'Linear LED profile', 'Italian marble'], collect($response->json('data'))->pluck('name')->all());
+        $this->assertSame(['score' => 5, 'views' => 0, 'enquiries' => 1], $response->json('data.0.popularity'));
+        $this->assertSame(['score' => 3, 'views' => 3, 'enquiries' => 0], $response->json('data.1.popularity'));
+
+        $this->getJson('/api/v1/products/popular?limit=1')->assertOk()->assertJsonCount(1, 'data');
+    }
+
     /**
      * @return array<int,string>
      */

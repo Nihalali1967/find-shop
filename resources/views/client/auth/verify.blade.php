@@ -25,7 +25,7 @@
             <label for="code">One-time code</label>
             <input id="code" class="otp-input @error('code') is-invalid @enderror" type="text"
                    name="code" inputmode="numeric" autocomplete="one-time-code"
-                   maxlength="6" pattern="[0-9]{6}" required autofocus>
+                   maxlength="6" required autofocus>
             <x-field-error name="code" />
         </div>
 

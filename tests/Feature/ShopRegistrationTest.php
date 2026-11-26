@@ -20,7 +20,29 @@ class ShopRegistrationTest extends TestCase
             'locality' => 'Indiranagar',
             'pincode' => '560038',
             'address' => '100 ft Road, Bengaluru',
+            'latitude' => 12.9784,
+            'longitude' => 77.6408,
         ];
+    }
+
+    public function test_registration_endpoint_requires_latitude_and_longitude(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('api', ['shop:onboarding'])->plainTextToken;
+
+        $payload = $this->payload('No Location Shop');
+        unset($payload['latitude'], $payload['longitude']);
+
+        $this->withApiToken($token)
+            ->postJson('/api/v1/shop/registration', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['latitude', 'longitude']);
+
+        $this->withApiToken($token)
+            ->postJson('/api/v1/shop/registration', $this->payload('Located Shop'))
+            ->assertCreated();
+
+        $this->assertDatabaseHas('shops', ['name' => 'Located Shop', 'latitude' => 12.9784, 'longitude' => 77.6408]);
     }
 
     public function test_normalized_duplicate_names_create_only_one_shop(): void

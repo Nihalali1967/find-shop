@@ -65,6 +65,34 @@
                                           class="@error('address') is-invalid @enderror">{{ old('address') }}</textarea>
                                 <x-field-error name="address" />
                             </div>
+
+                            <div class="field col-span-2">
+                                <label>Shop location on map</label>
+                                <div class="hint" style="margin-bottom:8px">
+                                    Click the map or drag the pin to your shop. You can also type the coordinates below.
+                                </div>
+                                <div class="btn-row" style="margin-bottom:8px">
+                                    <button type="button" class="btn btn-sm" data-locate-me>Use my current location</button>
+                                    <span class="hint" data-locate-status></span>
+                                </div>
+                                <div id="shop-map" style="height:300px;border-radius:12px;border:1px solid #d9d9d9;z-index:0"></div>
+                            </div>
+
+                            <div class="field">
+                                <label for="latitude">Latitude</label>
+                                <input id="latitude" type="number" name="latitude" value="{{ old('latitude') }}" required
+                                       step="any" min="-90" max="90" inputmode="decimal" placeholder="e.g. 12.9716"
+                                       class="@error('latitude') is-invalid @enderror">
+                                <x-field-error name="latitude" />
+                            </div>
+
+                            <div class="field">
+                                <label for="longitude">Longitude</label>
+                                <input id="longitude" type="number" name="longitude" value="{{ old('longitude') }}" required
+                                       step="any" min="-180" max="180" inputmode="decimal" placeholder="e.g. 77.5946"
+                                       class="@error('longitude') is-invalid @enderror">
+                                <x-field-error name="longitude" />
+                            </div>
                         </div>
                     </fieldset>
 
@@ -104,3 +132,73 @@
         </div>
     </div>
 @endsection
+
+@push('head')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+@endpush
+
+@push('scripts')
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        (function () {
+            var latInput = document.getElementById('latitude');
+            var lngInput = document.getElementById('longitude');
+            var status = document.querySelector('[data-locate-status]');
+
+            var hasValue = latInput.value !== '' && lngInput.value !== '';
+            var start = hasValue ? [parseFloat(latInput.value), parseFloat(lngInput.value)] : [12.9716, 77.5946];
+
+            var map = L.map('shop-map').setView(start, hasValue ? 16 : 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            var marker = null;
+
+            function setPoint(lat, lng, pan) {
+                lat = Math.round(lat * 1e7) / 1e7;
+                lng = Math.round(lng * 1e7) / 1e7;
+                latInput.value = lat;
+                lngInput.value = lng;
+                if (!marker) {
+                    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                    marker.on('dragend', function () {
+                        var p = marker.getLatLng();
+                        setPoint(p.lat, p.lng, false);
+                    });
+                } else {
+                    marker.setLatLng([lat, lng]);
+                }
+                if (pan) map.setView([lat, lng], Math.max(map.getZoom(), 16));
+            }
+
+            if (hasValue) setPoint(start[0], start[1], false);
+
+            map.on('click', function (e) { setPoint(e.latlng.lat, e.latlng.lng, false); });
+
+            // Manual typing moves the pin.
+            function fromInputs() {
+                var lat = parseFloat(latInput.value), lng = parseFloat(lngInput.value);
+                if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+                    setPoint(lat, lng, true);
+                }
+            }
+            latInput.addEventListener('change', fromInputs);
+            lngInput.addEventListener('change', fromInputs);
+
+            document.querySelector('[data-locate-me]').addEventListener('click', function () {
+                if (!navigator.geolocation) { status.textContent = 'Location is not supported in this browser.'; return; }
+                status.textContent = 'Finding your location…';
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    setPoint(pos.coords.latitude, pos.coords.longitude, true);
+                    status.textContent = 'Location set. Drag the pin to adjust.';
+                }, function () {
+                    status.textContent = 'Could not get your location. Click the map instead.';
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            });
+        })();
+    </script>
+@endpush

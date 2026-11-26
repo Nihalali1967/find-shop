@@ -24,14 +24,16 @@ class ShopRegistrationRequest extends FormRequest
             'gst_number' => ['nullable', 'string', 'max:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/'],
             'secondary_phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:160'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
         ];
     }
 
     public function messages(): array
     {
         return [
+            'latitude.required' => 'Pick your shop location on the map or enter the latitude.',
+            'longitude.required' => 'Pick your shop location on the map or enter the longitude.',
             'gst_number.regex' => 'Enter a valid 15-character GSTIN.',
             'pincode.digits' => 'Enter a six-digit Indian pincode.',
         ];

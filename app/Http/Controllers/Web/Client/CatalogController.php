@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Color;
 use App\Models\Product;
+use App\Services\Catalog\ProductPopularity;
 use App\Services\Catalog\ProductSearch;
 use App\Support\Money;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function show(Product $product): View
+    public function show(Request $request, Product $product, ProductPopularity $popularity): View
     {
         abort_unless($product->status === Product::STATUS_PUBLISHED, 404);
 
@@ -36,6 +37,8 @@ class CatalogController extends Controller
 
         abort_unless($product->shop && $product->shop->isActive(), 404);
         abort_unless($product->subcategory?->status === 'active' && $product->subcategory?->category?->status === 'active', 404);
+
+        $popularity->recordView($product, $request);
 
         $suggestions = Product::query()->visible()
             ->where('products.id', '!=', $product->id)
