@@ -41,7 +41,7 @@ class ProductController extends Controller
             ->when($sort === 'name', fn ($query) => $query->orderBy('name', $direction))
             ->when($sort === 'status', fn ($query) => $query->orderBy('status', $direction))
             ->when($sort === 'created_at', fn ($query) => $query->orderBy('created_at', $direction))
-            ->when($sort === 'price', fn ($query) => $query->orderByRaw('COALESCE(offer_price_paise, price_paise) '.$direction))
+            ->when($sort === 'price', fn ($query) => $query->orderByRaw('COALESCE(offer_price_paise, price_paise) IS NULL')->orderByRaw('COALESCE(offer_price_paise, price_paise) '.$direction))
             ->latest('id')
             ->paginate(DataTable::perPage($request, 12))
             ->withQueryString();

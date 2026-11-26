@@ -106,8 +106,9 @@ class ProductSearch
         }
 
         match ($sort) {
-            'price_asc' => $builder->orderByRaw($this->effectivePrice().' ASC')->orderBy('products.id'),
-            'price_desc' => $builder->orderByRaw($this->effectivePrice().' DESC')->orderBy('products.id'),
+            // Unpriced products always sort after priced ones.
+            'price_asc' => $builder->orderByRaw($this->effectivePrice().' IS NULL')->orderByRaw($this->effectivePrice().' ASC')->orderBy('products.id'),
+            'price_desc' => $builder->orderByRaw($this->effectivePrice().' IS NULL')->orderByRaw($this->effectivePrice().' DESC')->orderBy('products.id'),
             'oldest' => $builder->orderBy('products.created_at')->orderBy('products.id'),
             'name_asc' => $builder->orderBy('products.name')->orderBy('products.id'),
             default => $builder->orderByDesc('products.created_at')->orderByDesc('products.id'),

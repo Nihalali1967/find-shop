@@ -161,7 +161,12 @@
                 const p = parseFloat(price.value || "0");
                 const o = parseFloat(offer.value || "0");
                 const bad = o > 0 && o >= p;
-                if (warn) warn.hidden = !bad;
+                if (warn) {
+                    warn.hidden = !bad;
+                    warn.textContent = p > 0
+                        ? "Offer price must be lower than the regular price."
+                        : "Enter a regular price before adding an offer price.";
+                }
                 offer.classList.toggle("is-invalid", bad);
             };
             offer.addEventListener("input", check);

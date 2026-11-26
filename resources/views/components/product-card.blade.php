@@ -15,7 +15,7 @@
         @else
             <span class="placeholder">No image yet</span>
         @endif
-        @if ($product->offer_price_paise)
+        @if ($product->hasOffer())
             <span class="badge badge-offer flag">Offer</span>
         @endif
     </a>
@@ -48,8 +48,12 @@
         </div>
 
         <div class="price-line">
-            <span class="price">₹{{ \App\Support\Money::format($effective, false) }}</span>
-            @if ($product->offer_price_paise)
+            @if ($effective !== null)
+                <span class="price">₹{{ \App\Support\Money::format($effective, false) }}</span>
+            @else
+                <span class="price">Price on request</span>
+            @endif
+            @if ($product->hasOffer())
                 <span class="price-was">₹{{ \App\Support\Money::format($product->price_paise, false) }}</span>
             @endif
         </div>

@@ -123,8 +123,8 @@
                         </div>
 
                         <div class="field">
-                            <label for="price">Price (₹)</label>
-                            <input id="price" data-price-input type="number" name="price" step="0.01" min="0.01" required
+                            <label for="price">Price (₹) <span class="opt">(optional)</span></label>
+                            <input id="price" data-price-input type="number" name="price" step="0.01" min="0.01" placeholder="Leave blank for “Price on request”"
                                    value="{{ old('price', $rupees($product->price_paise)) }}">
                             <x-field-error name="price" />
                         </div>

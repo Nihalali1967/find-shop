@@ -48,8 +48,8 @@ class ProductRequest extends FormRequest
             'unit_id' => ['required', 'integer', Rule::exists('units', 'id')->where('is_active', true)],
             'custom_unit' => ['nullable', 'string', 'max:40'],
             'unit_count' => ['required', 'numeric', 'min:0.001', 'max:999999999'],
-            'price' => ['required', 'numeric', 'gt:0', 'max:99999999'],
-            'offer_price' => ['nullable', 'numeric', 'gt:0', 'lt:price'],
+            'price' => ['nullable', 'numeric', 'gt:0', 'max:99999999'],
+            'offer_price' => ['nullable', 'numeric', 'gt:0'],
             'color_ids' => ['required', 'array', 'min:1'],
             'color_ids.*' => ['integer', 'exists:colors,id'],
             'status' => ['required', Rule::in(['draft', 'published'])],
@@ -75,6 +75,18 @@ class ProductRequest extends FormRequest
             if ($unit && $unit->requires_custom && trim((string) $this->input('custom_unit')) === '') {
                 $validator->errors()->add('custom_unit', 'Describe the custom unit.');
             }
+
+            // Price is optional, but an offer only makes sense against a regular price.
+            $price = $this->input('price');
+            $offer = $this->input('offer_price');
+
+            if (filled($offer) && is_numeric($offer) && ! $validator->errors()->has('offer_price')) {
+                if (blank($price)) {
+                    $validator->errors()->add('offer_price', 'Enter a regular price before adding an offer price.');
+                } elseif (is_numeric($price) && (float) $offer >= (float) $price) {
+                    $validator->errors()->add('offer_price', 'The offer price must be lower than the regular price.');
+                }
+            }
         });
     }
 
@@ -95,7 +107,9 @@ class ProductRequest extends FormRequest
             'unit_id' => (int) $validated['unit_id'],
             'custom_unit' => $validated['custom_unit'] ?? null,
             'unit_count' => $validated['unit_count'],
-            'price_paise' => (int) Money::toPaise($validated['price']),
+            'price_paise' => isset($validated['price']) && $validated['price'] !== null
+                ? (int) Money::toPaise($validated['price'])
+                : null,
             'offer_price_paise' => isset($validated['offer_price']) && $validated['offer_price'] !== null
                 ? (int) Money::toPaise($validated['offer_price'])
                 : null,

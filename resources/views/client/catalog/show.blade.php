@@ -48,14 +48,18 @@
 
             <div class="detail-price-block">
                 <div class="flex center wrap-gap gap-2">
-                    <span class="big">₹{{ \App\Support\Money::format($effective, false) }}</span>
-                    @if ($product->offer_price_paise)
+                    @if ($effective !== null)
+                        <span class="big">₹{{ \App\Support\Money::format($effective, false) }}</span>
+                    @else
+                        <span class="big">Price on request</span>
+                    @endif
+                    @if ($product->hasOffer())
                         <span class="price-was">₹{{ \App\Support\Money::format($product->price_paise, false) }}</span>
                         <span class="badge badge-offer">Offer</span>
                     @endif
                 </div>
                 @php
-                    $pct = $product->offer_price_paise ? round((1 - $effective / max(1, $product->price_paise)) * 100) : 0;
+                    $pct = $product->hasOffer() ? round((1 - $effective / max(1, $product->price_paise)) * 100) : 0;
                 @endphp
                 <div class="unit-note mt-1">
                     for {{ $qty }} {{ \Illuminate\Support\Str::plural($unitLabel, (float) $qty === 1.0 ? 1 : 2) }}

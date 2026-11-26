@@ -78,14 +78,20 @@ class Product extends Model
         return $this->subcategory?->category;
     }
 
-    public function effectivePricePaise(): int
+    public function effectivePricePaise(): ?int
     {
         return $this->offer_price_paise ?? $this->price_paise;
     }
 
+    public function hasPrice(): bool
+    {
+        return $this->effectivePricePaise() !== null;
+    }
+
     public function hasOffer(): bool
     {
-        return $this->offer_price_paise !== null
+        return $this->price_paise !== null
+            && $this->offer_price_paise !== null
             && $this->offer_price_paise > 0
             && $this->offer_price_paise < $this->price_paise;
     }
@@ -111,8 +117,7 @@ class Product extends Model
             && ! empty($data['title'])
             && ! empty($data['description'])
             && ! empty($data['subcategory_id'])
-            && ! empty($data['unit_id'])
-            && ! empty($data['price_paise']);
+            && ! empty($data['unit_id']);
     }
 
     /**

@@ -78,8 +78,12 @@
                                     <div class="muted" style="font-size:.78rem">{{ $product->subcategory?->name }}</div>
                                 </td>
                                 <td class="nowrap">
-                                    ₹{{ \App\Support\Money::format($product->effectivePricePaise(), false) }}
-                                    @if ($product->offer_price_paise)
+                                    @if ($product->hasPrice())
+                                        ₹{{ \App\Support\Money::format($product->effectivePricePaise(), false) }}
+                                    @else
+                                        <span class="muted">Price on request</span>
+                                    @endif
+                                    @if ($product->hasOffer())
                                         <div class="price-was" style="font-size:.76rem">₹{{ \App\Support\Money::format($product->price_paise, false) }}</div>
                                     @endif
                                     <div class="muted" style="font-size:.75rem">per {{ \App\Support\Money::quantity($product->unit_count) }} {{ $product->unitLabel() }}</div>

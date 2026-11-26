@@ -169,15 +169,19 @@ class ProductService
 
     protected function assertPricing(array $data): void
     {
-        $price = (int) ($data['price_paise'] ?? 0);
+        $price = $data['price_paise'] ?? null;
+        $offer = $data['offer_price_paise'] ?? null;
 
-        if ($price <= 0) {
+        // Price is optional; when given it must be positive.
+        if ($price !== null && (int) $price <= 0) {
             throw MarketplaceException::invalid('Enter a price greater than zero.', 'PRICE_INVALID');
         }
 
-        $offer = $data['offer_price_paise'] ?? null;
+        if ($offer !== null && $price === null) {
+            throw MarketplaceException::invalid('Enter a regular price before adding an offer price.', 'OFFER_INVALID');
+        }
 
-        if ($offer !== null && ((int) $offer <= 0 || (int) $offer >= $price)) {
+        if ($offer !== null && ((int) $offer <= 0 || (int) $offer >= (int) $price)) {
             throw MarketplaceException::invalid('The offer price must be lower than the regular price.', 'OFFER_INVALID');
         }
     }

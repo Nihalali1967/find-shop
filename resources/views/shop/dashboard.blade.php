@@ -71,7 +71,7 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="nowrap">₹{{ \App\Support\Money::format($product->effectivePricePaise(), false) }}</td>
+                                    <td class="nowrap">{{ $product->hasPrice() ? '₹'.\App\Support\Money::format($product->effectivePricePaise(), false) : 'Price on request' }}</td>
                                     <td><x-status-badge :status="$product->status" /></td>
                                 </tr>
                             @endforeach
